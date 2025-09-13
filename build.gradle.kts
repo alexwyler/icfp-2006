@@ -26,4 +26,5 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     implementation("commons-io:commons-io:2.20.0")
     implementation("it.unimi.dsi:fastutil:8.5.16")
+    implementation("io.vavr:vavr:1.0.0-alpha-4")
 }

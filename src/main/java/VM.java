@@ -1,11 +1,16 @@
+import io.vavr.control.Try;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class VM {
 
@@ -27,7 +32,13 @@ public class VM {
     private final PlatterArrays arrays;
     private int[] program;
     private int pc = 0;
-    public VM(int[] program) {
+
+    private final Supplier<Integer> in;
+    private final Consumer<Integer> out;
+
+    public VM(int[] program, final Supplier<Integer> in, final Consumer<Integer> out) {
+        this.in = in;
+        this.out = out;
         arrays = new PlatterArrays();
         arrays.alloc(program.length);
         arrays.set(0, program);
@@ -35,7 +46,7 @@ public class VM {
     }
 
 
-    public void run() throws IOException {
+    public void run() {
         while (true) {
             int instr = program[pc++];
             int op = instr >>> 28;
@@ -85,10 +96,10 @@ public class VM {
                             arrays.abandon(registers[C]);
                             break;
                         case OP_OUT:
-                            System.out.print((char) (registers[C] & 0xFF));
+                            out.accept(registers[C] & 0xFF);
                             break;
                         case OP_IN:
-                            registers[C] = System.in.read();
+                            registers[C] = in.get();
                             break;
                         case OP_LOAD:
                             program = arrays.load(registers[B]);
@@ -105,19 +116,90 @@ public class VM {
         }
     }
 
-    static int[] decodeProgram(String resource) throws IOException {
+    static int[] decodeProgram(String resource) {
         try (InputStream in = VM.class.getResourceAsStream(resource)) {
             byte[] bytes = IOUtils.toByteArray(in);
             int[] program = new int[bytes.length / 4];
             ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN).asIntBuffer().get(program);
             return program;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
     public static void main(String[] args) throws IOException, URISyntaxException {
-        int[] program = decodeProgram("/sandmark.umz");
+        //runCodex();
 
-        VM vm = new VM(program);
+        runDump();
+    }
+
+    private static void runDump() {
+        int[] program = decodeProgram("/dump-1757795378648.um");
+        VM vm = new VM(program, () -> Try.of(() -> System.in.read()).get(), (v) -> System.out.print((char) (int) v));
         vm.run();
+    }
+
+    public static void runCodex() {
+        int[] program = decodeProgram("/codex.umz");
+        final AtomicInteger keyIndex = new AtomicInteger(0);
+        String keyToInject = "(\\b.bb)(\\v.vv)06FHPVboundvarHRAk";
+        AtomicBoolean decryptNextInput = new AtomicBoolean(false);
+        StringBuilder lastOutput = new StringBuilder();
+        AtomicBoolean dumping = new AtomicBoolean(false);
+        File dumpFile = new File("dump-" + System.currentTimeMillis() + ".um");
+        try (OutputStream dumpOut = new BufferedOutputStream(new FileOutputStream(dumpFile))) {
+
+            Supplier<Integer> in = () -> {
+                if (decryptNextInput.get()) {
+                    if (keyIndex.get() < keyToInject.length()) {
+                        return (int) keyToInject.charAt(keyIndex.getAndIncrement());
+                    } else {
+                        decryptNextInput.set(false);
+                        keyIndex.set(0);
+                        return (int) '\n';
+                    }
+                } else {
+                    try {
+                        int read = System.in.read();
+                        return read;
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            };
+
+            Consumer<Integer> out = (v) -> {
+                char c = (char) (int) v;
+
+                // Write to dump if active
+                if (dumping.get()) {
+                    try {
+                        dumpOut.write(v);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                } else {
+                    lastOutput.append(c);
+                    // Trigger key injection
+                    if (lastOutput.toString().endsWith("enter decryption key:")) {
+                        decryptNextInput.set(true);
+                        lastOutput.setLength(0);
+                    }
+                    // Trigger dumping based on specific prompt
+                    if (lastOutput.toString().endsWith("UM program follows colon:")) {
+                        dumping.set(true);
+                        lastOutput.setLength(0);
+                    }
+                    System.out.print(c);
+                }
+            };
+
+            VM vm = new VM(program, in, out);
+            vm.run();
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
