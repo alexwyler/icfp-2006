@@ -25,4 +25,5 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     implementation("commons-io:commons-io:2.20.0")
+    implementation("it.unimi.dsi:fastutil:8.5.16")
 }

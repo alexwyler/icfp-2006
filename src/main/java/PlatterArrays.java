@@ -1,18 +1,31 @@
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.stream.IntStream;
 
 class PlatterArrays {
-
-    int lastLoadedIndex = -1;
     final private ArrayList<int[]> allocated = new ArrayList<>();
-    final private ArrayDeque<Integer> abandoned = new ArrayDeque<>();
+    final private IntStack abandoned = new IntStack();
+
+    // Copy-on-write between array 0 and the last-loaded array
+    int activeAlias = -1;
+    // Only copy up to the highest written offset when copyng-on-write
+    final private IntArrayList highestWrittenOffset = new IntArrayList();
 
     public int[] get(int index) {
         return allocated.get(index);
     }
 
     public int[] set(int index, int[] dest) {
+        int largestWriteIndex = IntStream.range(0, dest.length)
+            .map(i -> dest.length - 1 - i)
+            .filter(i -> dest[i] != 0)
+            .findFirst()
+            .orElse(-1);
+
+        highestWrittenOffset.set(index, largestWriteIndex);
         return allocated.set(index, dest);
     }
 
@@ -20,37 +33,70 @@ class PlatterArrays {
         var array = new int[numPlatters];
         final int index;
         if (!abandoned.isEmpty()) {
-            index = abandoned.removeLast();
+            index = abandoned.pop();
             allocated.set(index, array);
+            highestWrittenOffset.set(index, -1);
+
         } else {
             index = allocated.size();
             allocated.add(array);
+            highestWrittenOffset.add(-1);
         }
         return index;
     }
 
     public void abandon(int index) {
-        allocated.set(index, null);
-        if (lastLoadedIndex == index) {
-            lastLoadedIndex = 0;
+        if (activeAlias == index) {
+            activeAlias = -1;
         }
-        abandoned.add(index);
+        abandoned.push(index);
     }
 
     public int[] load(int index) {
         var program = allocated.get(index);
-        allocated.set(0, program);
-        lastLoadedIndex = index;
+        highestWrittenOffset.set(0, highestWrittenOffset.get(index));
+        if (index != 0) {
+            allocated.set(0, program);
+            activeAlias = index;
+        }
         return program;
     }
 
     public void amend(int index, int offset, int value) {
-        if (lastLoadedIndex == index) {
-            int[] curProgram = allocated.get(0);
-            allocated.set(index, Arrays.copyOf(curProgram, curProgram.length));
-            lastLoadedIndex = -1;
+        if (activeAlias == index || (index == 0 && activeAlias > 0)) {
+            int[] curProgram = allocated.getFirst();
+            int largestWriteIndexProgram = highestWrittenOffset.getFirst();
+            int[] allocatedCopy = new int[curProgram.length];
+            System.arraycopy(curProgram, 0, allocatedCopy, 0, largestWriteIndexProgram + 1);
+            allocated.set(index, allocatedCopy);
+            activeAlias = -1;
         }
+
+        int highestWrittenOffsetTarget = this.highestWrittenOffset.get(index);
         allocated.get(index)[offset] = value;
+        if (value != 0 && (offset > highestWrittenOffsetTarget)) {
+            highestWrittenOffset.set(index, offset);
+        }
+    }
+
+    final static class IntStack {
+        private int[] stack = new int[1024];
+        private int top = 0;
+
+        void push(int value) {
+            if (top == stack.length) {
+                stack = Arrays.copyOf(stack, stack.length * 2);
+            }
+            stack[top++] = value;
+        }
+
+        int pop() {
+            return stack[--top];
+        }
+
+        boolean isEmpty() {
+            return top == 0;
+        }
     }
 
 }
