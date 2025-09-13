@@ -1,5 +1,15 @@
 plugins {
+    application
     id("java")
+}
+
+application {
+    mainClass.set("VM")
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 group = "com.alexwyler"
@@ -9,11 +19,10 @@ repositories {
     mavenCentral()
 }
 
+
+
 dependencies {
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
-}
-
-tasks.test {
-    useJUnitPlatform()
+    implementation("commons-io:commons-io:2.20.0")
 }
