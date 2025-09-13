@@ -4,6 +4,7 @@ import java.util.Arrays;
 
 class PlatterArrays {
 
+    int lastLoadedIndex = -1;
     final private ArrayList<int[]> allocated = new ArrayList<>();
     final private ArrayDeque<Integer> abandoned = new ArrayDeque<>();
 
@@ -30,13 +31,26 @@ class PlatterArrays {
 
     public void abandon(int index) {
         allocated.set(index, null);
+        if (lastLoadedIndex == index) {
+            lastLoadedIndex = 0;
+        }
         abandoned.add(index);
     }
 
     public int[] load(int index) {
-        var program = Arrays.copyOf(allocated.get(index), allocated.get(index).length);
+        var program = allocated.get(index);
         allocated.set(0, program);
+        lastLoadedIndex = index;
         return program;
+    }
+
+    public void amend(int index, int offset, int value) {
+        if (lastLoadedIndex == index) {
+            int[] curProgram = allocated.get(0);
+            allocated.set(index, Arrays.copyOf(curProgram, curProgram.length));
+            lastLoadedIndex = -1;
+        }
+        allocated.get(index)[offset] = value;
     }
 
 }

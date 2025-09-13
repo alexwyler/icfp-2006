@@ -62,7 +62,7 @@ public class VM {
                             registers[A] = arrays.get(registers[B])[registers[C]];
                             break;
                         case OP_AMEND:
-                            arrays.get(registers[A])[registers[B]] = registers[C];
+                            arrays.amend(registers[A], registers[B], registers[C]);
                             break;
                         case OP_ADD:
                             registers[A] = (registers[B] + registers[C]);
@@ -115,7 +115,7 @@ public class VM {
     }
 
     public static void main(String[] args) throws IOException, URISyntaxException {
-        int[] program = decodeProgram("/codex.umz");
+        int[] program = decodeProgram("/sandmark.umz");
 
         VM vm = new VM(program);
         vm.run();
