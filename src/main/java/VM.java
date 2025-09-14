@@ -93,7 +93,12 @@ public class VM {
     private static void runDump() {
 
         IntArrayList inputs = new IntArrayList();
-        IntSupplier in = replayInputLinesSupplier("adventure_input.txt");
+        IntSupplier inRaw = replayInputLinesSupplier("adventure_input.txt");
+        IntSupplier in = () -> {
+            int v = inRaw.getAsInt();
+            inputs.add(v);
+            return v;
+        };
         int[] program = decodeProgram("/dump-1757795378648.um");
         VM vm = new VM(program, in, (v) -> System.out.print((char) (int) v));
         long start = System.currentTimeMillis();
