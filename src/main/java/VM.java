@@ -1,16 +1,12 @@
-import io.vavr.control.Try;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.commons.io.IOUtils;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.List;
 import java.util.function.IntConsumer;
-import java.util.function.IntSupplier;
 
 public class VM {
 
@@ -33,12 +29,10 @@ public class VM {
     private int[] program;
     private int pc = 0;
 
-    private final IntSupplier in;
-    private final IntConsumer out;
+    private final List<IO> ios;
 
-    public VM(int[] program, final IntSupplier in, final IntConsumer out) {
-        this.in = in;
-        this.out = out;
+    public VM(int[] program, final List<IO> ios) {
+        this.ios = ios;
         arrays = new PlatterArrays();
         arrays.alloc(program.length);
         arrays.set(0, program);
@@ -51,43 +45,7 @@ public class VM {
         runDump("adventure_solve_input.txt");
     }
 
-    static IntSupplier replayInputLinesSupplier(String resource) {
-        try (InputStream in = VM.class.getClassLoader()
-            .getResourceAsStream(resource)) {
 
-            if (in == null) {
-                throw new IllegalArgumentException("Resource not found: " + resource);
-            }
-
-            byte[] data = in.readAllBytes();
-
-            return new IntSupplier() {
-                int index = 0;
-
-                @Override
-                public int getAsInt() {
-                    try {
-                        if (index < data.length) {
-                            int ret = data[index++] & 0xFF; // unsigned 8-bit
-                            System.out.print((char) ret);
-                            return ret;
-                        } else {
-                            int value = System.in.read();
-                            if (value == -1) {
-                                throw new IllegalStateException("End of System.in reached");
-                            }
-                            return value & 0xFF;
-                        }
-                    } catch (IOException e) {
-                        throw new RuntimeException("Error reading System.in", e);
-                    }
-                }
-            };
-
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to load resource " + resource, e);
-        }
-    }
 
 
     static int[] decodeProgram(String resource) {
@@ -103,101 +61,95 @@ public class VM {
 
     private static void runDump(String inputFile) {
 
-        IntArrayList inputs = new IntArrayList();
-        IntSupplier inRaw = replayInputLinesSupplier(inputFile);
-        IntSupplier in = () -> {
-            int v = inRaw.getAsInt();
-            inputs.add(v);
-            return v;
-        };
+        List<IO> ios = List.of(new IO.Script(inputFile), new IO.Manual());
+
         int[] program = decodeProgram("/dump-1757795378648.um");
-        VM vm = new VM(program, in, (v) -> System.out.print((char) (int) v));
+        VM vm = new VM(program, ios);
         long start = System.currentTimeMillis();
         vm.run();
-        System.out.println("Inputs were: ");
-        for (int i = 0; i < inputs.size(); ++i) {
-            System.out.print((char) inputs.getInt(i));
-        }
         System.out.println("took " + (System.currentTimeMillis() - start) + "ms");
     }
 
     private static void runSandmark() {
         int[] program = decodeProgram("/sandmark.umz");
-        VM vm = new VM(program, () -> Try.of(() -> System.in.read()).get(), (v) -> System.out.print((char) (int) v));
+        List<IO> ios = List.of(new IO.Manual());
+        VM vm = new VM(program, ios);
         long start = System.currentTimeMillis();
         vm.run();
         System.out.println("took " + (System.currentTimeMillis() - start) + "ms");
     }
 
-    public static void runCodex() {
-        int[] program = decodeProgram("/codex.umz");
-        final AtomicInteger keyIndex = new AtomicInteger(0);
-        String keyToInject = "(\\b.bb)(\\v.vv)06FHPVboundvarHRAk";
-        AtomicBoolean decryptNextInput = new AtomicBoolean(false);
-        StringBuilder lastOutput = new StringBuilder();
-        AtomicBoolean dumping = new AtomicBoolean(false);
-        File dumpFile = new File("dump-" + System.currentTimeMillis() + ".um");
-        try (OutputStream dumpOut = new BufferedOutputStream(new FileOutputStream(dumpFile))) {
-
-            IntSupplier in = () -> {
-                if (decryptNextInput.get()) {
-                    if (keyIndex.get() < keyToInject.length()) {
-                        return (int) keyToInject.charAt(keyIndex.getAndIncrement());
-                    } else {
-                        decryptNextInput.set(false);
-                        keyIndex.set(0);
-                        return (int) '\n';
-                    }
-                } else {
-                    try {
-                        int read = System.in.read();
-                        return read;
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            };
-
-            IntConsumer out = (v) -> {
-                char c = (char) (int) v;
-
-                // Write to dump if active
-                if (dumping.get()) {
-                    try {
-                        dumpOut.write(v);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                } else {
-                    lastOutput.append(c);
-                    // Trigger key injection
-                    if (lastOutput.toString().endsWith("enter decryption key:")) {
-                        decryptNextInput.set(true);
-                        lastOutput.setLength(0);
-                    }
-                    // Trigger dumping based on specific prompt
-                    if (lastOutput.toString().endsWith("UM program follows colon:")) {
-                        dumping.set(true);
-                        lastOutput.setLength(0);
-                    }
-                    System.out.print(c);
-                }
-            };
-
-            VM vm = new VM(program, in, out);
-            vm.run();
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    //    public static void runCodex() {
+    //        int[] program = decodeProgram("/codex.umz");
+    //        final AtomicInteger keyIndex = new AtomicInteger(0);
+    //        String keyToInject = "(\\b.bb)(\\v.vv)06FHPVboundvarHRAk";
+    //        AtomicBoolean decryptNextInput = new AtomicBoolean(false);
+    //        StringBuilder lastOutput = new StringBuilder();
+    //        AtomicBoolean dumping = new AtomicBoolean(false);
+    //        File dumpFile = new File("dump-" + System.currentTimeMillis() + ".um");
+    //        try (OutputStream dumpOut = new BufferedOutputStream(new FileOutputStream(dumpFile))) {
+    //
+    //            IntSupplier in = () -> {
+    //                if (decryptNextInput.get()) {
+    //                    if (keyIndex.get() < keyToInject.length()) {
+    //                        return (int) keyToInject.charAt(keyIndex.getAndIncrement());
+    //                    } else {
+    //                        decryptNextInput.set(false);
+    //                        keyIndex.set(0);
+    //                        return (int) '\n';
+    //                    }
+    //                } else {
+    //                    try {
+    //                        int read = System.in.read();
+    //                        return read;
+    //                    } catch (IOException e) {
+    //                        throw new RuntimeException(e);
+    //                    }
+    //                }
+    //            };
+    //
+    //            IntConsumer out = (v) -> {
+    //                char c = (char) (int) v;
+    //
+    //                // Write to dump if active
+    //                if (dumping.get()) {
+    //                    try {
+    //                        dumpOut.write(v);
+    //                    } catch (IOException e) {
+    //                        throw new RuntimeException(e);
+    //                    }
+    //                } else {
+    //                    lastOutput.append(c);
+    //                    // Trigger key injection
+    //                    if (lastOutput.toString().endsWith("enter decryption key:")) {
+    //                        decryptNextInput.set(true);
+    //                        lastOutput.setLength(0);
+    //                    }
+    //                    // Trigger dumping based on specific prompt
+    //                    if (lastOutput.toString().endsWith("UM program follows colon:")) {
+    //                        dumping.set(true);
+    //                        lastOutput.setLength(0);
+    //                    }
+    //                    System.out.print(c);
+    //                }
+    //            };
+    //
+    //            VM vm = new VM(program, in, out);
+    //            vm.run();
+    //        } catch (FileNotFoundException e) {
+    //            throw new RuntimeException(e);
+    //        } catch (IOException e) {
+    //            throw new RuntimeException(e);
+    //        }
+    //    }
 
     public void run() {
         var registers = this.registers;
         var arrays = this.arrays;
         var pc = this.pc;
         var program = this.program;
+        int ioIndex = -1;
+        IO io = null;
         try {
             while (true) {
                 int instr = program[pc++];
@@ -262,10 +214,17 @@ public class VM {
                         arrays.abandon(registers[C]);
                         break;
                     case OP_OUT:
+                        if (io == null || io.isDone()) {
+                            io = ios.get(++ioIndex);
+                        }
+                        IntConsumer out = io.getOut();
                         out.accept(registers[C] & 0xFF);
                         break;
                     case OP_IN:
-                        registers[C] = in.getAsInt();
+                        if (io == null || io.isDone()) {
+                            io = ios.get(++ioIndex);
+                        }
+                        registers[C] = io.getIn().getAsInt();
                         break;
                     case OP_LOAD:
                         program = arrays.load(registers[B]);
