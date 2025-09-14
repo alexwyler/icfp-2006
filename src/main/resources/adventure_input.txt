@@ -1,0 +1,57 @@
+howie
+xyzzy
+ls
+adventure
+go north
+take bolt
+examine bolt
+incinerate bolt
+take spring
+examine spring
+incinerate spring
+take button
+examine button
+incinerate button
+take processor
+examine processor
+incinerate processor
+take pill
+examine pill
+incinerate pill
+take radio
+examine radio
+incinerate radio
+take cache
+examine cache
+incinerate cache
+take blue transistor
+examine blue transistor
+incinerate blue transistor
+take antenna
+examine antenna
+incinerate antenna
+take screw
+examine screw
+incinerate screw
+take motherboard
+examine motherboard
+incinerate motherboard
+take A-1920-IXB
+examine A-1920-IXB
+incinerate A-1920-IXB
+take red transistor
+examine red transistor
+incinerate red transistor
+take keypad
+examine keypad
+incinerate keypad
+take trash
+examine trash
+incinerate trash
+exit
+exit
+exit
+
+
+
+

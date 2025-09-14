@@ -1,10 +1,12 @@
 import io.vavr.control.Try;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.commons.io.IOUtils;
 
 import java.io.*;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
@@ -44,10 +46,38 @@ public class VM {
     }
 
     public static void main(String[] args) throws IOException, URISyntaxException {
-        //runCodex();
-        runSandmark();
-        //runDump();
+        ///runCodex();
+        //runSandmark();
+        runDump();
     }
+
+    static IntSupplier replayInputLinesSupplier(String resource) {
+        try (InputStream in = VM.class.getClassLoader()
+            .getResourceAsStream(resource)) {
+
+            if (in == null) {
+                throw new IllegalArgumentException("Resource not found: " + resource);
+            }
+
+            byte[] data = in.readAllBytes();
+
+            return new IntSupplier() {
+                int index = 0;
+
+                @Override
+                public int getAsInt() {
+                    if (index >= data.length) {
+                        throw new IllegalStateException("End of input reached");
+                    }
+                    return data[index++] & 0xFF; // unsigned 8-bit
+                }
+            };
+
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load resource " + resource, e);
+        }
+    }
+
 
     static int[] decodeProgram(String resource) {
         try (InputStream in = VM.class.getResourceAsStream(resource)) {
@@ -61,10 +91,17 @@ public class VM {
     }
 
     private static void runDump() {
+
+        IntArrayList inputs = new IntArrayList();
+        IntSupplier in = replayInputLinesSupplier("adventure_input.txt");
         int[] program = decodeProgram("/dump-1757795378648.um");
-        VM vm = new VM(program, () -> Try.of(() -> System.in.read()).get(), (v) -> System.out.print((char) (int) v));
+        VM vm = new VM(program, in, (v) -> System.out.print((char) (int) v));
         long start = System.currentTimeMillis();
         vm.run();
+        System.out.println("Inputs were: ");
+        for (int i = 0; i < inputs.size(); ++i) {
+            System.out.print((char) inputs.getInt(i));
+        }
         System.out.println("took " + (System.currentTimeMillis() - start) + "ms");
     }
 
