@@ -35,7 +35,9 @@ class PlatterArrays {
     public int[] load(int index) {
         var program = allocated.get(index);
         if (index != 0) {
-            allocated.set(0, Arrays.copyOf(program, program.length));
+            int[] newProgram = new int[program.length];
+            System.arraycopy(program, 0, newProgram, 0, program.length);
+            allocated.set(0, newProgram);
         }
         return program;
     }
