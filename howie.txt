@@ -1,0 +1,4 @@
+% hack.exe howie
+attempting hack with LIII passwords 
+found match!! for user howie
+password: xyzzy
