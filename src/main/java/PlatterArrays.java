@@ -1,6 +1,5 @@
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.stream.IntStream;
@@ -10,7 +9,7 @@ class PlatterArrays {
     final private IntStack abandoned = new IntStack();
 
     // Copy-on-write between array 0 and the last-loaded array
-    int activeAlias = -1;
+    public int activeAlias = -1;
     // Only copy up to the highest written offset when copyng-on-write
     final private IntArrayList highestWrittenOffset = new IntArrayList();
 
@@ -18,15 +17,17 @@ class PlatterArrays {
         return allocated.get(index);
     }
 
-    public int[] set(int index, int[] dest) {
-        int largestWriteIndex = IntStream.range(0, dest.length)
-            .map(i -> dest.length - 1 - i)
-            .filter(i -> dest[i] != 0)
-            .findFirst()
-            .orElse(-1);
+    public void set(int index, int[] dest) {
+        int largestWriteIndex = -1;
+        for (int i = dest.length - 1; i >= 0; --i) {
+            if (dest[i] != 0) {
+                largestWriteIndex = i;
+                break;
+            }
+        }
 
         highestWrittenOffset.set(index, largestWriteIndex);
-        return allocated.set(index, dest);
+        allocated.set(index, dest);
     }
 
     public int alloc(int numPlatters) {
@@ -54,7 +55,7 @@ class PlatterArrays {
 
     public int[] load(int index) {
         var program = allocated.get(index);
-        highestWrittenOffset.set(0, highestWrittenOffset.get(index));
+        highestWrittenOffset.set(0, highestWrittenOffset.getInt(index));
         if (index != 0) {
             allocated.set(0, program);
             activeAlias = index;
@@ -63,7 +64,7 @@ class PlatterArrays {
     }
 
     public void amend(int index, int offset, int value) {
-        if (activeAlias == index || (index == 0 && activeAlias > 0)) {
+        if ((activeAlias == index && activeAlias != 0) || (index == 0 && activeAlias > 0)) {
             int[] curProgram = allocated.getFirst();
             int largestWriteIndexProgram = highestWrittenOffset.getFirst();
             int[] allocatedCopy = new int[curProgram.length];
@@ -72,8 +73,9 @@ class PlatterArrays {
             activeAlias = -1;
         }
 
-        int highestWrittenOffsetTarget = this.highestWrittenOffset.get(index);
-        allocated.get(index)[offset] = value;
+        int highestWrittenOffsetTarget = this.highestWrittenOffset.getInt(index);
+        int[] target = allocated.get(index);
+        target[offset] = value;
         if (value != 0 && (offset > highestWrittenOffsetTarget)) {
             highestWrittenOffset.set(index, offset);
         }
