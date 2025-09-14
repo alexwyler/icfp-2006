@@ -1,0 +1,51 @@
+howie
+xyzzy
+ls
+adventure
+go north
+take bolt
+take spring
+incinerate spring
+take button
+take processor
+take red pill
+incinerate red pill
+take radio
+take cache
+combine processor with cache
+take blue transistor
+combine radio with blue transistor
+take antenna
+incinerate antenna
+take screw
+take motherboard
+combine motherboard with screw
+take A-1920-IXB
+combine A-1920-IXB with radio
+take red transistor
+combine A-1920-IXB with processor
+combine A-1920-IXB with bolt
+combine A-1920-IXB with red transistor
+combine motherboard with A-1920-IXB
+take keypad
+combine keypad with motherboard
+combine keypad with button
+go south
+use keypad
+take /etc/passwd
+inc take /etc/passwd
+switch xml
+examine
+take self-addressed note
+inc take self-addressed note
+examine
+take downloader
+examine downloader
+inc downloader
+take uploader
+examine uploader
+inc downloader
+go east
+examine
+take orange-red X-9247-GWE
+examine orange-red X-9247-GWE

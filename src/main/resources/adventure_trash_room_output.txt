@@ -1,0 +1,85 @@
+You are in a room with a pile of junk. A hallway leads south. 
+There is a bolt here. 
+Underneath the bolt, there is a spring. 
+Underneath the spring, there is a button. 
+Underneath the button, there is a (broken) processor. 
+Underneath the processor, there is a red pill. 
+Underneath the pill, there is a (broken) radio. 
+Underneath the radio, there is a cache. 
+Underneath the cache, there is a blue transistor. 
+Underneath the transistor, there is an antenna. 
+Underneath the antenna, there is a screw. 
+Underneath the screw, there is a (broken) motherboard. 
+Underneath the motherboard, there is a (broken) A-1920-IXB. 
+Underneath the A-1920-IXB, there is a red transistor. 
+Underneath the transistor, there is a (broken) keypad. 
+Underneath the keypad, there is some trash. 
+
+>: The processor is from the elusive 19x86 line. 
+Also, it is broken: it is a processor missing a cache. 
+
+>: The radio is a hi-fi AM/FM stereophonic radio.
+Also, it is broken: it is a radio missing a transistor and an
+antenna. 
+
+>: The motherboard is well-used.
+Also, it is broken: it is a motherboard missing a A-1920-IXB and
+a screw. 
+
+>: The A-1920-IXB is an exemplary instance of part number
+A-1920-IXB. 
+Also, it is broken: it is (a A-1920-IXB missing a transistor)
+missing (a radio missing an antenna) and a processor and a bolt.
+
+>: The keypad is labeled "use me".
+Also, it is broken: it is a keypad missing a motherboard and a
+button. 
+
+>: The keypad has been destroyed. 
+
+
+cache
+transistor
+radio
+processor
+bolt
+A-1920-IXB
+screw
+motherboard
+button
+keypad
+
+take bolt
+take spring
+incinerate spring
+take button
+take processor
+take red pill
+incinerate red pill
+take radio
+take cache
+combine processor with cache
+take blue transistor
+combine radio with blue transistor
+take antenna
+incinerate antenna
+take screw
+take motherboard
+combine motherboard with screw
+take A-1920-IXB
+combine A-1920-IXB with radio
+combine A-1920-IXB with processor
+combine A-1920-IXB with bolt
+combine motherboard with A-1920-IXB
+combine motherboard with screw
+take red transistor
+incinerate red transistor
+take keypad
+combine keypad with motherboard
+combine keypad with button
+
+
+
+
+
+

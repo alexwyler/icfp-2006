@@ -48,7 +48,7 @@ public class VM {
     public static void main(String[] args) throws IOException, URISyntaxException {
         ///runCodex();
         //runSandmark();
-        runDump();
+        runDump("adventure_solve_input.txt");
     }
 
     static IntSupplier replayInputLinesSupplier(String resource) {
@@ -66,10 +66,21 @@ public class VM {
 
                 @Override
                 public int getAsInt() {
-                    if (index >= data.length) {
-                        throw new IllegalStateException("End of input reached");
+                    try {
+                        if (index < data.length) {
+                            int ret = data[index++] & 0xFF; // unsigned 8-bit
+                            System.out.print((char) ret);
+                            return ret;
+                        } else {
+                            int value = System.in.read();
+                            if (value == -1) {
+                                throw new IllegalStateException("End of System.in reached");
+                            }
+                            return value & 0xFF;
+                        }
+                    } catch (IOException e) {
+                        throw new RuntimeException("Error reading System.in", e);
                     }
-                    return data[index++] & 0xFF; // unsigned 8-bit
                 }
             };
 
@@ -90,10 +101,10 @@ public class VM {
         }
     }
 
-    private static void runDump() {
+    private static void runDump(String inputFile) {
 
         IntArrayList inputs = new IntArrayList();
-        IntSupplier inRaw = replayInputLinesSupplier("adventure_input.txt");
+        IntSupplier inRaw = replayInputLinesSupplier(inputFile);
         IntSupplier in = () -> {
             int v = inRaw.getAsInt();
             inputs.add(v);

@@ -27,4 +27,6 @@ dependencies {
     implementation("commons-io:commons-io:2.20.0")
     implementation("it.unimi.dsi:fastutil:8.5.16")
     implementation("io.vavr:vavr:1.0.0-alpha-4")
+    implementation("com.google.guava:guava:33.2.1-jre")
+    implementation("org.jgrapht:jgrapht-core:1.5.2")
 }
