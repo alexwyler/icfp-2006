@@ -55,8 +55,8 @@ class PlatterArrays {
 
     public int[] load(int index) {
         var program = allocated.get(index);
-        highestWrittenOffset.set(0, highestWrittenOffset.getInt(index));
         if (index != 0) {
+            highestWrittenOffset.set(0, highestWrittenOffset.getInt(index));
             allocated.set(0, program);
             activeAlias = index;
         }
