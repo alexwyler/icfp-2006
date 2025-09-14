@@ -181,7 +181,7 @@ public class VM {
                     case OP_AMEND: {
                         int index = registers[A];
                         int offset = registers[B];
-                        if (index == 0 && arrays.activeAlias == -1) {
+                        if (index == 0) {
                             program[offset] = registers[C];
                         } else {
                             arrays.amend(index, offset, registers[C]);
