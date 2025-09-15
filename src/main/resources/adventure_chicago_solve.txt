@@ -1,0 +1,6 @@
+howie
+xyzzy
+ls
+adventure
+switch xml
+go north

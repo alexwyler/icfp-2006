@@ -2,7 +2,9 @@ howie
 xyzzy
 ls
 adventure
+switch sexp
 go north
+switch english
 take bolt
 examine bolt
 incinerate bolt
@@ -19,7 +21,9 @@ take pill
 examine pill
 incinerate pill
 take radio
+switch sexp
 examine radio
+switch english
 incinerate radio
 take cache
 examine cache

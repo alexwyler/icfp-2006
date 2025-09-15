@@ -1,3 +1,9 @@
+package alexwyler;
+
+import alexwyler.IO.FileScript;
+import alexwyler.IO.StringIO;
+import alexwyler.IO.SystemInOut;
+import alexwyler.StackSolver.Item;
 import org.apache.commons.io.IOUtils;
 
 import java.io.IOException;
@@ -42,7 +48,9 @@ public class VM {
     public static void main(String[] args) throws IOException, URISyntaxException {
         ///runCodex();
         //runSandmark();
-        runDump("adventure_solve_input.txt");
+        //runDump("adventure_examine_input.txt");
+        runUmixWithTrashRoomSolve("adventure_trash_room_stack_solve.txt");
+
     }
 
 
@@ -61,7 +69,7 @@ public class VM {
 
     private static void runDump(String inputFile) {
 
-        List<IO> ios = List.of(new IO.Script(inputFile), new IO.Manual());
+        List<IO> ios = List.of(new FileScript(inputFile), new SystemInOut());
 
         int[] program = decodeProgram("/dump-1757795378648.um");
         VM vm = new VM(program, ios);
@@ -70,9 +78,31 @@ public class VM {
         System.out.println("took " + (System.currentTimeMillis() - start) + "ms");
     }
 
+    static void runUmixWithTrashRoomSolve() {
+        List<IO> ios = List.of(
+            new StringIO("""
+                howie
+                xyzzy
+                ls
+                adventure
+                switch sexp
+                go north
+                """),
+            new StackSolverIO(new Item("keypad", null, List.of())),
+            new StringIO("""
+                go south
+                use keypad
+                examine
+                """),
+            new SystemInOut());
+
+        VM vm = new VM(decodeProgram("/umix.um"), ios);
+        vm.run();
+    }
+
     private static void runSandmark() {
         int[] program = decodeProgram("/sandmark.umz");
-        List<IO> ios = List.of(new IO.Manual());
+        List<IO> ios = List.of(new SystemInOut());
         VM vm = new VM(program, ios);
         long start = System.currentTimeMillis();
         vm.run();
@@ -134,7 +164,7 @@ public class VM {
     //                }
     //            };
     //
-    //            VM vm = new VM(program, in, out);
+    //            alexwyler.VM vm = new alexwyler.VM(program, in, out);
     //            vm.run();
     //        } catch (FileNotFoundException e) {
     //            throw new RuntimeException(e);

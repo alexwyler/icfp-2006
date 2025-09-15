@@ -21,6 +21,7 @@ take screw
 take motherboard
 combine motherboard with screw
 take A-1920-IXB
+examine A-1920-IXB
 combine A-1920-IXB with radio
 take red transistor
 combine A-1920-IXB with processor
@@ -32,20 +33,4 @@ combine keypad with motherboard
 combine keypad with button
 go south
 use keypad
-take /etc/passwd
-inc take /etc/passwd
-switch xml
 examine
-take self-addressed note
-inc take self-addressed note
-examine
-take downloader
-examine downloader
-inc downloader
-take uploader
-examine uploader
-inc downloader
-go east
-examine
-take orange-red X-9247-GWE
-examine orange-red X-9247-GWE

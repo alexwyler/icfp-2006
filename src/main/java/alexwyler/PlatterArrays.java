@@ -1,8 +1,9 @@
+package alexwyler;
+
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.stream.IntStream;
 
 class PlatterArrays {
     final private ArrayList<int[]> allocated = new ArrayList<>();

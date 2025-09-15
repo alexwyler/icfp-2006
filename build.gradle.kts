@@ -29,4 +29,5 @@ dependencies {
     implementation("io.vavr:vavr:1.0.0-alpha-4")
     implementation("com.google.guava:guava:33.2.1-jre")
     implementation("org.jgrapht:jgrapht-core:1.5.2")
+    implementation("org.apache.commons:commons-collections4:4.5.0")
 }
