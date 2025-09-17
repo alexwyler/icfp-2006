@@ -11,7 +11,9 @@ import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.IntConsumer;
 
 public class VM {
@@ -45,135 +47,12 @@ public class VM {
         this.program = program;
     }
 
-    public static void main(String[] args) throws IOException, URISyntaxException {
-        ///runCodex();
-        //runSandmark();
-        //runDump("adventure_examine_input.txt");
-        runUmixWithTrashRoomSolve("adventure_trash_room_stack_solve.txt");
 
+    public CompletableFuture<Void> runAsync() {
+        return CompletableFuture.runAsync(this::run);
     }
 
-
-
-
-    static int[] decodeProgram(String resource) {
-        try (InputStream in = VM.class.getResourceAsStream(resource)) {
-            byte[] bytes = IOUtils.toByteArray(in);
-            int[] program = new int[bytes.length / 4];
-            ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN).asIntBuffer().get(program);
-            return program;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static void runDump(String inputFile) {
-
-        List<IO> ios = List.of(new FileScript(inputFile), new SystemInOut());
-
-        int[] program = decodeProgram("/dump-1757795378648.um");
-        VM vm = new VM(program, ios);
-        long start = System.currentTimeMillis();
-        vm.run();
-        System.out.println("took " + (System.currentTimeMillis() - start) + "ms");
-    }
-
-    static void runUmixWithTrashRoomSolve() {
-        List<IO> ios = List.of(
-            new StringIO("""
-                howie
-                xyzzy
-                ls
-                adventure
-                switch sexp
-                go north
-                """),
-            new StackSolverIO(new Item("keypad", null, List.of())),
-            new StringIO("""
-                go south
-                use keypad
-                examine
-                """),
-            new SystemInOut());
-
-        VM vm = new VM(decodeProgram("/umix.um"), ios);
-        vm.run();
-    }
-
-    private static void runSandmark() {
-        int[] program = decodeProgram("/sandmark.umz");
-        List<IO> ios = List.of(new SystemInOut());
-        VM vm = new VM(program, ios);
-        long start = System.currentTimeMillis();
-        vm.run();
-        System.out.println("took " + (System.currentTimeMillis() - start) + "ms");
-    }
-
-    //    public static void runCodex() {
-    //        int[] program = decodeProgram("/codex.umz");
-    //        final AtomicInteger keyIndex = new AtomicInteger(0);
-    //        String keyToInject = "(\\b.bb)(\\v.vv)06FHPVboundvarHRAk";
-    //        AtomicBoolean decryptNextInput = new AtomicBoolean(false);
-    //        StringBuilder lastOutput = new StringBuilder();
-    //        AtomicBoolean dumping = new AtomicBoolean(false);
-    //        File dumpFile = new File("dump-" + System.currentTimeMillis() + ".um");
-    //        try (OutputStream dumpOut = new BufferedOutputStream(new FileOutputStream(dumpFile))) {
-    //
-    //            IntSupplier in = () -> {
-    //                if (decryptNextInput.get()) {
-    //                    if (keyIndex.get() < keyToInject.length()) {
-    //                        return (int) keyToInject.charAt(keyIndex.getAndIncrement());
-    //                    } else {
-    //                        decryptNextInput.set(false);
-    //                        keyIndex.set(0);
-    //                        return (int) '\n';
-    //                    }
-    //                } else {
-    //                    try {
-    //                        int read = System.in.read();
-    //                        return read;
-    //                    } catch (IOException e) {
-    //                        throw new RuntimeException(e);
-    //                    }
-    //                }
-    //            };
-    //
-    //            IntConsumer out = (v) -> {
-    //                char c = (char) (int) v;
-    //
-    //                // Write to dump if active
-    //                if (dumping.get()) {
-    //                    try {
-    //                        dumpOut.write(v);
-    //                    } catch (IOException e) {
-    //                        throw new RuntimeException(e);
-    //                    }
-    //                } else {
-    //                    lastOutput.append(c);
-    //                    // Trigger key injection
-    //                    if (lastOutput.toString().endsWith("enter decryption key:")) {
-    //                        decryptNextInput.set(true);
-    //                        lastOutput.setLength(0);
-    //                    }
-    //                    // Trigger dumping based on specific prompt
-    //                    if (lastOutput.toString().endsWith("UM program follows colon:")) {
-    //                        dumping.set(true);
-    //                        lastOutput.setLength(0);
-    //                    }
-    //                    System.out.print(c);
-    //                }
-    //            };
-    //
-    //            alexwyler.VM vm = new alexwyler.VM(program, in, out);
-    //            vm.run();
-    //        } catch (FileNotFoundException e) {
-    //            throw new RuntimeException(e);
-    //        } catch (IOException e) {
-    //            throw new RuntimeException(e);
-    //        }
-    //    }
-
-    public void run() {
+    private void run() {
         var registers = this.registers;
         var arrays = this.arrays;
         var pc = this.pc;

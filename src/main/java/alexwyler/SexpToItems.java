@@ -1,24 +1,59 @@
 package alexwyler;
 
+import alexwyler.StackSolver.Item;
+import io.vavr.Tuple2;
+import io.vavr.Tuple3;
+
 import java.util.ArrayList;
 import java.util.List;
 
 // Courtesy of ChatGPT
 public final class SexpToItems {
 
-    public static List<StackSolver.Item> parseStack(String s) {
+    public static Tuple3<Boolean, List<Item>, String> parseStack(String s) {
         Object root = new P(s).any();
-        List<?> items = find(root, "items");
-        if (items == null || ((List<?>) items).size() < 2) {
-            throw new IllegalArgumentException("no (items ...)");
+
+        // check if it's a failure
+        if (headIs(root, "failed")) {
+            return new Tuple3<>(false, null, null);
         }
+
+        // find the command node
+        List<?> cmd = find(root, "command");
+        if (cmd == null) {
+            throw new IllegalArgumentException("no (command ...)");
+        }
+
+        // collect all items anywhere under command
         List<StackSolver.Item> out = new ArrayList<>();
-        for (Object o : list(((List<?>) items).get(1))) {
-            if (headIs(o, "item")) {
-                flatten((List<?>) o, out);
+        collectItems(cmd, out);
+
+        String roomName = null;
+
+        List<?> look = find(cmd, "look");
+        if (look != null) {
+            List<?> room = find(look, "room");
+            if (room != null) {
+                List<?> nameField = field(room, "name");
+                roomName = nameField != null ? str(nameField, 1) : null;
             }
         }
-        return out;
+
+        return new Tuple3<>(true, out, roomName);
+    }
+
+
+
+    private static void collectItems(Object node, List<StackSolver.Item> out) {
+        if (headIs(node, "item")) {
+            flatten((List<?>) node, out);
+            return;
+        }
+        if (node instanceof List<?> l) {
+            for (Object c : l) {
+                collectItems(c, out);
+            }
+        }
     }
 
     private static void flatten(List<?> item, List<StackSolver.Item> out) {
@@ -116,7 +151,9 @@ public final class SexpToItems {
         return null;
     }
 
-    private static boolean headIs(Object o, String h) {return (o instanceof List<?> l) && !l.isEmpty() && h.equals(l.get(0));}
+    private static boolean headIs(Object o, String h) {
+        return (o instanceof List<?> l) && !l.isEmpty() && h.equals(l.get(0));
+    }
 
     private static String str(List<?> l, int i) {
         Object v = l.size() > i ? l.get(i) : null;
@@ -145,8 +182,8 @@ public final class SexpToItems {
                 (success (command (go (room (name "Junk Room")(description "You are in a room with a pile of junk. A hallway leads south. ")(items ((item (name "bolt")(description "quite useful for securing all sorts of things")(adjectives )(condition (pristine ))(piled_on ((item (name "spring")(description "tightly coiled")(adjectives )(condition (pristine ))(piled_on ((item (name "button")(description "labeled 6")(adjectives )(condition (pristine ))(piled_on ((item (name "processor")(description "from the elusive 19x86 line")(adjectives )(condition (broken (condition (pristine ))(missing ((kind (name "cache")(condition (pristine ))) ))))(piled_on ((item (name "pill")(description "tempting looking")(adjectives ((adjective "red") ))(condition (pristine ))(piled_on ((item (name "radio")(description "a hi-fi AM/FM stereophonic radio")(adjectives )(condition (broken (condition (pristine ))(missing ((kind (name "transistor")(condition (pristine ))) ((kind (name "antenna")(condition (pristine ))) )))))(piled_on ((item (name "cache")(description "fully-associative")(adjectives )(condition (pristine ))(piled_on ((item (name "transistor")(description "PNP-complete")(adjectives ((adjective "blue") ))(condition (pristine ))(piled_on ((item (name "antenna")(description "appropriate for receiving transmissions between 30 kHz and 30 MHz")(adjectives )(condition (pristine ))(piled_on ((item (name "screw")(description "not from a Dutch company")(adjectives )(condition (pristine ))(piled_on ((item (name "motherboard")(description "well-used")(adjectives )(condition (broken (condition (pristine ))(missing ((kind (name "A-1920-IXB")(condition (pristine ))) ((kind (name "screw")(condition (pristine ))) )))))(piled_on ((item (name "A-1920-IXB")(description "an exemplary instance of part number A-1920-IXB")(adjectives )(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name "transistor")(condition (pristine ))) ))))(missing ((kind (name "radio")(condition (broken (condition (pristine ))(missing ((kind (name "antenna")(condition (pristine ))) ))))) ((kind (name "processor")(condition (pristine ))) ((kind (name "bolt")(condition (pristine ))) ))))))(piled_on ((item (name "transistor")(description "NPN-complete")(adjectives ((adjective "red") ))(condition (pristine ))(piled_on ((item (name "keypad")(description "labeled \\"use me\\"")(adjectives )(condition (broken (condition (pristine ))(missing ((kind (name "motherboard")(condition (pristine ))) ((kind (name "button")(condition (pristine ))) )))))(piled_on ((item (name "trash")(description "of absolutely no value")(adjectives )(condition (pristine ))(piled_on )) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))))))
             """;
 
-        List<StackSolver.Item> items = parseStack(s);
-        for (StackSolver.Item it : items) {
+        var parsed = parseStack(s);
+        for (StackSolver.Item it : parsed._2) {
             System.out.println(it);
         }
     }
@@ -157,7 +194,9 @@ public final class SexpToItems {
         final String s;
         int i = 0;
 
-        P(String s) {this.s = s;}
+        P(String s) {
+            this.s = s;
+        }
 
         Object any() {
             skip();

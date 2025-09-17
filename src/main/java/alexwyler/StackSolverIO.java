@@ -16,9 +16,11 @@ public class StackSolverIO implements IO {
     boolean exhausted = false;
     StringBuilder sb = new StringBuilder();
     final Item targetItem;
+    final List<Item> inventory;
 
-    public StackSolverIO(final Item targetItem) {
+    public StackSolverIO(final Item targetItem, final List<Item> inventory) {
         this.targetItem = targetItem;
+        this.inventory = inventory;
         AtomicInteger planStep = new AtomicInteger(0);
         AtomicInteger charIndex = new AtomicInteger(0);
         List<String> plan = new ArrayList<>();
@@ -27,7 +29,7 @@ public class StackSolverIO implements IO {
                 System.out.println(sb.toString());
                 var parsed = SexpToItems.parseStack(sb.toString());
                 System.out.println(parsed);
-                StackSolver stackSolver = new StackSolver(parsed, targetItem);
+                StackSolver stackSolver = new StackSolver(parsed._2, inventory, targetItem);
                 plan.addAll(stackSolver.solve());
                 System.out.println(plan);
             }
