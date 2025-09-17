@@ -11,6 +11,7 @@ import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.List;
+import java.util.Set;
 
 public class Main {
 
@@ -56,20 +57,21 @@ public class Main {
         asyncIO.call("""
             howie
             xyzzy
-        """);
+        """, true);
         asyncIO.call("""
             adventure
             switch sexp
-        """);
+        """, true);
         {
             asyncIO.call("""
                 go north
-                take bolt
-                """);
+                """, true);
             var inventory = SexpToItems.parseStack(asyncIO.call("inventory"))._2;
             var parsed = SexpToItems.parseStack(asyncIO.call("examine"));
-            var stackSolver = new StackSolver(parsed._2, inventory, new Item("keypad", null, List.of()));
-            stackSolver.solve().forEach(asyncIO::call);
+            var stackSolver = new StackSolver(parsed._2, inventory, new Item("keypad", null, Set.of()));
+            var plans = stackSolver.solve();
+            asyncIO.log(plans);
+            plans.forEach(plan -> asyncIO.call(plan, true));
         }
         asyncIO.call("""
             go south
@@ -79,7 +81,7 @@ public class Main {
             inc /etc/passwd
             take note
             inc note
-        """);
+        """, true);
 
         ChicagoSolver solver = new ChicagoSolver(asyncIO);
         solver.solve();

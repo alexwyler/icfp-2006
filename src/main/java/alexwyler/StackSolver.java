@@ -3,9 +3,27 @@ package alexwyler;
 import io.vavr.Tuple2;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class StackSolver {
+
+    private final Set<Item> neededItems;
+
+    private static Set<Item> computeNeededIems(Item root) {
+        Set<Item> items = new HashSet<>();
+        Set<Item> visited = new HashSet<>();
+        Deque<Item> dq = new ArrayDeque<>();
+        dq.push(root);
+        while (!dq.isEmpty()) {
+            Item cur = dq.pop();
+            for (Item m : cur.missing) {
+                items.add(m);
+                if (visited.add(m)) dq.push(m);
+            }
+        }
+        return items;
+    }
 
     static final int CAPACITY = 6;
     final List<Item> stack;
@@ -16,17 +34,8 @@ public class StackSolver {
         this.stack = initialStack;
         this.targetItem = targetItem;
         this.inventory = inventory;
+        neededItems = computeNeededIems(targetItem);
     }
-
-    private static List<Tuple2<Integer, Integer>> allPairs(int n) {
-        return IntStream.range(0, n)
-            .boxed()
-            .flatMap(i -> IntStream.range(i + 1, n)
-                .mapToObj(j -> new Tuple2<>(i, j)))
-            .toList();
-    }
-
-
 
     static Tuple2<Item, Item> unorderedPair(Item a, Item b) {
         return a.compareTo(b) <= 0 ? new Tuple2<>(a, b) : new Tuple2<>(b, a);
@@ -35,47 +44,17 @@ public class StackSolver {
     private boolean dfs(
         int idx,
         List<Item> inv,
-        Set<String> seen,
+        Set<Integer> seen,
         List<String> plan
     ) {
 
-        if (idx == stack.size() && inv.contains(targetItem)) {
+        if (inv.contains(targetItem)) {
             return true;
         }
-        List<String> sigs = inv.stream().map(Item::toString).sorted().toList();
-        if (!seen.add(idx + "|" + String.join(",", sigs))) {
+
+        int stateHash = Objects.hash(idx, new HashSet<>(inv));
+        if (!seen.add(stateHash)) {
             return false;
-        }
-
-        // try combine
-        for (var p : allPairs(inv.size())) {
-            Item a = inv.get(p._1);
-            Item b = inv.get(p._2);
-            Item result;
-            String planString;
-            if (a.canCombineWith(b)) {
-                result = a.combineWith(b);
-                planString = "combine " + a.toPlanString() + " with " + b.toPlanString();
-            } else if (b.canCombineWith(a)) {
-                result = b.combineWith(a);
-                planString = "combine " + b.toPlanString() + " with " + a.toPlanString();
-            } else {
-                continue;
-            }
-
-            inv.remove(a);
-            inv.remove(b);
-            inv.add(result);
-            plan.add(planString);
-
-            if (dfs(idx, inv, seen, plan)) {
-                return true;
-            }
-
-            plan.remove((int) (plan.size() - 1));
-            inv.remove((int) (inv.size() - 1));
-            inv.add(p._1, a);
-            inv.add(p._2, b);
         }
 
         // take
@@ -88,30 +67,68 @@ public class StackSolver {
             }
             inv.remove((int) (inv.size() - 1));
             plan.remove((int) (plan.size() - 1));
-        }
+        } else {
+            // try combine
+            for (int i = 0; i < inv.size(); i++) {
+                Item a = inv.get(i);
+                for (int j = i + 1; j < inv.size(); j++) {
+                    Item b = inv.get(j);
 
-        // incinerate
-        for (int i = 0; i < inv.size(); i++) {
-            Item x = inv.get(i);
-            if (x.equals(targetItem) || this.inventory.contains(x)) {
-                continue;
+                    Item result;
+                    String planString;
+                    if (a.canCombineWith(b)) {
+                        result = a.combineWith(b);
+                        planString = "combine " + a.toPlanString() + " with " + b.toPlanString();
+                    } else if (b.canCombineWith(a)) {
+                        result = b.combineWith(a);
+                        planString = "combine " + b.toPlanString() + " with " + a.toPlanString();
+                    } else {
+                        continue;
+                    }
+
+                    inv.remove(j);
+                    inv.remove(i);
+                    inv.add(result);
+                    plan.add(planString);
+
+                    if (dfs(idx, inv, seen, plan))
+                        return true;
+
+                    plan.remove(plan.size() - 1);
+                    inv.remove(inv.size() - 1);
+                    inv.add(i, a);
+                    inv.add(j, b);
+                }
             }
-            inv.remove(i);
-            plan.add("incinerate " + x.toPlanString());
-            if (dfs(idx, inv, seen, plan)) {
-                return true;
+
+            // incinerate
+            for (int i = 0; i < inv.size(); i++) {
+                Item x = inv.get(i);
+                if (x.equals(targetItem) || this.inventory.contains(x)) {
+                    continue;
+                }
+                if (neededItems.contains(x)) {
+                    continue;
+                }
+
+                inv.remove(i);
+                plan.add("incinerate " + x.toPlanString());
+                if (dfs(idx, inv, seen, plan)) {
+                    return true;
+                }
+                inv.add(i, x);
+                plan.removeLast();
             }
-            inv.add(i, x);
-            plan.remove(plan.size() - 1);
         }
 
         return false;
     }
 
     public List<String> solve() {
+        long startTime = System.currentTimeMillis();
         List<String> plan = new ArrayList<>();
         List<Item> inventory = new ArrayList<>(this.inventory);
-        Set<String> seen = new HashSet<>();
+        Set<Integer> seen = new HashSet<>();
 
         if (!dfs(0, inventory, seen, plan)) {
             throw new RuntimeException("No solution found");
@@ -124,13 +141,35 @@ public class StackSolver {
             plan.add("incinerate " + x.toPlanString());
         }
 
+        long endTime = System.currentTimeMillis();
+        System.out.println("Solved in " + (endTime - startTime) + "ms, plan length " + plan.size());
         return plan;
     }
 
-    public record Item(String name, String adjective, List<Item> missing) implements Comparable<Item> {
+    public static class Item implements Comparable<Item> {
+
+        private final String name;
+        private final String adjective;
+        private final Set<Item> missing;
+        private final String planName;
+        // Cached fields
+        private Integer cachedHash = null;
+        private final Map<Item, Boolean> canCombineCache = new HashMap<>();
+
+        public Item(String name, String adjective, Set<Item> missing) {
+            this.name = name;
+            this.adjective = adjective;
+            this.missing = Collections.unmodifiableSet(new HashSet<>(missing));
+            this.planName = (adjective != null ? adjective + " " : "") + name;
+        }
+
+        // Record-style getters
+        public String name() { return name; }
+        public String adjective() { return adjective; }
+        public Set<Item> missing() { return missing; }
 
         public String toPlanString() {
-            return (adjective != null ? adjective + " " : "") + name;
+            return planName;
         }
 
         @Override
@@ -139,97 +178,57 @@ public class StackSolver {
                    (missing.isEmpty() ? " *working* " : " missing=" + missing);
         }
 
-        public boolean isEquivalent(Item other) {
-            if (!this.name.equals(other.name)) {
-                return false;
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Item item)) return false;
+            return Objects.equals(name, item.name)
+                   && Objects.equals(adjective, item.adjective)
+                   && Objects.equals(missing, item.missing);
+        }
+
+        @Override
+        public int hashCode() {
+            if (cachedHash == null) {
+                cachedHash = Objects.hash(name, adjective, missing);
             }
+            return cachedHash;
+        }
 
-            List<Item> otherMissing = new ArrayList<>(other.missing);
-
-            if (this.missing.size() != otherMissing.size()) {
-                return false;
-            }
-
-            boolean allMatched = this.missing.stream().allMatch(t -> {
-                for (Item o : otherMissing) {
-                    if (t.isEquivalent(o)) {
-                        otherMissing.remove(o);
-                        return true;
-                    }
-                }
-                return false;
-            });
-
-            return allMatched;
+        @Override
+        public int compareTo(Item o) {
+            int cmp = name.compareTo(o.name);
+            if (cmp != 0) return cmp;
+            cmp = Objects.compare(adjective, o.adjective, Comparator.nullsFirst(String::compareTo));
+            if (cmp != 0) return cmp;
+            cmp = Integer.compare(missing.size(), o.missing.size());
+            if (cmp != 0) return cmp;
+            return missing.toString().compareTo(o.missing.toString());
         }
 
         public boolean canCombineWith(Item other) {
-            if (this.name.equals(other.name)) {
-                return false;
-            }
-            if (this.missing.isEmpty()) {
-                return false;
-            }
-
-            if (!this.missing.stream()
-                .anyMatch(r -> r.isEquivalent(other))) {
-                return false;
-            }
-            return true;
+            return canCombineCache.computeIfAbsent(other, (o) -> missing.stream().anyMatch(m -> m.isEquivalentSansAdjective(o)));
         }
 
         public Item combineWith(Item other) {
-            ArrayList<Item> newMissing = new ArrayList<>(this.missing);
-            var toRemove = this.missing.stream()
-                .filter(missing -> missing.isEquivalent(other))
-                .findFirst()
-                .get();
-            newMissing.remove(toRemove);
-            return new Item(this.name, this.adjective, newMissing);
+            Set<Item> newMissing = missing.stream()
+                .filter(m -> !m.isEquivalentSansAdjective(other))
+                .collect(Collectors.toSet());
+            return new Item(name, adjective, newMissing);
         }
 
-        @Override
-        public int compareTo(final Item o) {
-            return name.compareTo(o.name);
-        }
+        /** Recursive comparison ignoring adjectives */
+        public boolean isEquivalentSansAdjective(Item other) {
+            if (!name.equals(other.name)) return false;
+            if (missing.size() != other.missing.size()) return false;
 
+            for (Item m : missing) {
+                boolean matched = other.missing.stream().anyMatch(om -> m.isEquivalentSansAdjective(om));
+                if (!matched) return false;
+            }
+            return true;
+        }
     }
-
-    public static final class CombineRules {
-
-        final Map<Tuple2<Item, Item>, Item> pairToResult = new HashMap<>();
-
-        public void add(Item a, Item b, Item result) {
-            pairToResult.put(unorderedPair(a, b), result);
-        }
-
-        public Optional<Item> combine(Item a, Item b) {
-            return Optional.ofNullable(pairToResult.get(unorderedPair(a, b)));
-        }
-
-        @Override
-        public String toString() {
-            return "Rules{" +
-                   "pairToResult=" + pairToResult +
-                   '}';
-        }
-
-    }
-
-    record Key(int idx, List<Item> invCanon) {
-
-        Key(int idx, Collection<Item> inv) {
-            this(idx, sortedCopy(inv));
-        }
-
-        private static List<Item> sortedCopy(Collection<Item> inv) {
-            List<Item> copy = new ArrayList<>(inv);
-            Collections.sort(copy);
-            return copy;
-        }
-
-    }
-
 
     public static void main(String[] args) {
         //        List<Item> stack1 = new ArrayList<>();
@@ -341,9 +340,10 @@ public class StackSolver {
         //                combine keypad with button""");
         //        }
         {
-            String rawSexp = "(success (command (look (room (name \"54th Street and Dorchester Avenue\")(description \"You are standing at the corner of 54th Street and Dorchester Avenue. From here, you can go north, east, south, or west. \")(items ((item (name \"X-9247-GWE\")(description \"an exemplary instance of part number X-9247-GWE\")(adjectives ((adjective \"orange-red\") ))(condition (pristine ))(piled_on ((item (name \"V-0010-XBD\")(description \"an exemplary instance of part number V-0010-XBD\")(adjectives ((adjective \"magenta\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"X-9247-GWE\")(condition (pristine ))) ))))(piled_on ((item (name \"F-1403-QDS\")(description \"an exemplary instance of part number F-1403-QDS\")(adjectives ((adjective \"pumpkin\") ))(condition (pristine ))(piled_on ((item (name \"P-5065-WQO\")(description \"an exemplary instance of part number P-5065-WQO\")(adjectives ((adjective \"heavy\") ))(condition (broken (condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"T-6678-BTV\")(condition (pristine ))) ))))(missing ((kind (name \"B-4832-LAL\")(condition (pristine ))) ))))(missing ((kind (name \"F-1403-QDS\")(condition (pristine ))) ))))(piled_on ((item (name \"B-4832-LAL\")(description \"an exemplary instance of part number B-4832-LAL\")(adjectives ((adjective \"taupe\") ))(condition (pristine ))(piled_on ((item (name \"L-6458-RNH\")(description \"an exemplary instance of part number L-6458-RNH\")(adjectives ((adjective \"gray40\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"P-5065-WQO\")(condition (broken (condition (pristine ))(missing ((kind (name \"T-6678-BTV\")(condition (pristine ))) ))))) ))))(piled_on ((item (name \"T-9887-OFC\")(description \"an exemplary instance of part number T-9887-OFC\")(adjectives ((adjective \"eggplant\") ))(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"X-6458-TIJ\")(condition (pristine ))) ))))(missing ((kind (name \"H-9887-MKY\")(condition (pristine ))) ))))(piled_on ((item (name \"Z-1623-CEK\")(description \"an exemplary instance of part number Z-1623-CEK\")(adjectives ((adjective \"indigo\") ))(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"D-4292-HHR\")(condition (pristine ))) ))))(missing ((kind (name \"L-6458-RNH\")(condition (pristine ))) ))))(piled_on ((item (name \"H-9887-MKY\")(description \"an exemplary instance of part number H-9887-MKY\")(adjectives ((adjective \"yellow-green\") ))(condition (pristine ))(piled_on ((item (name \"F-6678-DOX\")(description \"an exemplary instance of part number F-6678-DOX\")(adjectives ((adjective \"shiny\") ))(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"J-9247-IRG\")(condition (pristine ))) ))))(missing ((kind (name \"V-0010-XBD\")(condition (pristine ))) ))))(piled_on ((item (name \"R-1403-SXU\")(description \"an exemplary instance of part number R-1403-SXU\")(adjectives ((adjective \"pale-green\") ))(condition (pristine ))(piled_on ((item (name \"USB cable\")(description \"compatible with all high-speed Universal Sand Bus 2.0 devices\")(adjectives )(condition (broken (condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"T-9887-OFC\")(condition (broken (condition (pristine ))(missing ((kind (name \"X-6458-TIJ\")(condition (pristine ))) ))))) ))))(missing ((kind (name \"F-6678-DOX\")(condition (pristine ))) ))))(missing ((kind (name \"N-4832-NUN\")(condition (pristine ))) ))))(piled_on ((item (name \"N-4832-NUN\")(description \"an exemplary instance of part number N-4832-NUN\")(adjectives ((adjective \"sienna\") ))(condition (pristine ))(piled_on ((item (name \"J-9247-IRG\")(description \"an exemplary instance of part number J-9247-IRG\")(adjectives ((adjective \"slate-gray\") ))(condition (pristine ))(piled_on ((item (name \"B-5065-YLQ\")(description \"an exemplary instance of part number B-5065-YLQ\")(adjectives ((adjective \"dim-gray\") ))(condition (pristine ))(piled_on )) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))))))";
+            String rawSexp = "(success (command (look (room (name \"53th Street and Dorchester Avenue\")(description \"You are standing at the corner of 53th Street and Dorchester Avenue. From here, you can go north, east, or south. \")(items ((item (name \"N-1623-AOE\")(description \"an exemplary instance of part number N-1623-AOE\")(adjectives ((adjective \"fern-green\") ))(condition (pristine ))(piled_on ((item (name \"R-4292-FRL\")(description \"an exemplary instance of part number R-4292-FRL\")(adjectives ((adjective \"burgundy\") ))(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"V-9887-KUS\")(condition (pristine ))) ))))(missing ((kind (name \"Z-6458-PXZ\")(condition (broken (condition (pristine ))(missing ((kind (name \"D-5065-UBI\")(condition (pristine ))) ))))) ))))(piled_on ((item (name \"F-6458-DDN\")(description \"an exemplary instance of part number F-6458-DDN\")(adjectives ((adjective \"pale-magenta\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"J-5065-IGU\")(condition (pristine ))) ))))(piled_on ((item (name \"H-1623-MYO\")(description \"an exemplary instance of part number H-1623-MYO\")(adjectives ((adjective \"peach-yellow\") ))(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"L-4292-RCV\")(condition (pristine ))) ))))(missing ((kind (name \"T-6458-BIL\")(condition (broken (condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"X-5065-GLS\")(condition (pristine ))) ))))(missing ((kind (name \"T-5065-OQC\")(condition (broken (condition (pristine ))(missing ((kind (name \"B-6678-LOZ\")(condition (pristine ))) ))))) ))))(missing ((kind (name \"F-9247-QRI\")(condition (pristine ))) ))))) ((kind (name \"P-9887-WFE\")(condition (pristine ))) )))))(piled_on ((item (name \"H-4292-ZHF\")(description \"an exemplary instance of part number H-4292-ZHF\")(adjectives ((adjective \"rotating\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"J-4832-VUP\")(condition (pristine ))) ))))(piled_on ((item (name \"R-6458-FXP\")(description \"an exemplary instance of part number R-6458-FXP\")(adjectives ((adjective \"low-carb\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"V-5065-KBW\")(condition (pristine ))) ((kind (name \"H-1623-MYO\")(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"L-4292-RCV\")(condition (pristine ))) ))))(missing ((kind (name \"P-9887-WFE\")(condition (pristine ))) ))))) ((kind (name \"H-4292-ZHF\")(condition (broken (condition (pristine ))(missing ((kind (name \"J-4832-VUP\")(condition (pristine ))) ))))) ))))))(piled_on ((item (name \"T-6458-BIL\")(description \"an exemplary instance of part number T-6458-BIL\")(adjectives ((adjective \"mysterious\") ))(condition (broken (condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"X-5065-GLS\")(condition (pristine ))) ))))(missing ((kind (name \"T-5065-OQC\")(condition (broken (condition (pristine ))(missing ((kind (name \"B-6678-LOZ\")(condition (pristine ))) ))))) ))))(missing ((kind (name \"F-9247-QRI\")(condition (pristine ))) ))))(piled_on ((item (name \"R-9247-SMK\")(description \"an exemplary instance of part number R-9247-SMK\")(adjectives ((adjective \"brass\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"V-4832-XPR\")(condition (pristine ))) ))))(piled_on ((item (name \"Z-1403-CSY\")(description \"an exemplary instance of part number Z-1403-CSY\")(adjectives ((adjective \"puce\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"D-0010-HVH\")(condition (pristine ))) ))))(piled_on ((item (name \"N-6678-NJD\")(description \"an exemplary instance of part number N-6678-NJD\")(adjectives ((adjective \"pink\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"R-9247-SMK\")(condition (broken (condition (pristine ))(missing ((kind (name \"V-4832-XPR\")(condition (pristine ))) ))))) ))))(piled_on ((item (name \"X-4292-TWX\")(description \"an exemplary instance of part number X-4292-TWX\")(adjectives ((adjective \"jade\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"N-6678-NJD\")(condition (pristine ))) ((kind (name \"B-9887-YAG\")(condition (pristine ))) )))))(piled_on ((item (name \"Z-6678-PEF\")(description \"an exemplary instance of part number Z-6678-PEF\")(adjectives ((adjective \"flax\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"X-4292-TWX\")(condition (broken (condition (pristine ))(missing ((kind (name \"B-9887-YAG\")(condition (pristine ))) ))))) ))))(piled_on ((item (name \"H-4832-ZKT\")(description \"an exemplary instance of part number H-4832-ZKT\")(adjectives ((adjective \"pale-blue\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"L-1403-ENC\")(condition (pristine ))) ))))(piled_on ((item (name \"P-0010-JQJ\")(description \"an exemplary instance of part number P-0010-JQJ\")(adjectives ((adjective \"gray60\") ))(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"P-9247-WCO\")(condition (pristine ))) ))))(missing ((kind (name \"T-1623-OTQ\")(condition (pristine ))) ))))(piled_on ((item (name \"J-1403-IDG\")(description \"an exemplary instance of part number J-1403-IDG\")(adjectives ((adjective \"olive-green\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"H-4832-ZKT\")(condition (broken (condition (pristine ))(missing ((kind (name \"L-1403-ENC\")(condition (pristine ))) ))))) ))))(piled_on ((item (name \"D-9247-UHM\")(description \"an exemplary instance of part number D-9247-UHM\")(adjectives ((adjective \"swamp-green\") ))(condition (pristine ))(piled_on ((item (name \"N-6458-NDX\")(description \"an exemplary instance of part number N-6458-NDX\")(adjectives ((adjective \"khaki\") ))(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"L-6678-RYH\")(condition (pristine ))) ))))(missing ((kind (name \"Z-6678-PEF\")(condition (pristine ))) ((kind (name \"J-1403-IDG\")(condition (pristine ))) ((kind (name \"P-9247-WCO\")(condition (pristine ))) ))))))(piled_on ((item (name \"V-9887-KUS\")(description \"an exemplary instance of part number V-9887-KUS\")(adjectives ((adjective \"red-violet\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"R-6458-FXP\")(condition (broken (condition (pristine ))(missing ((kind (name \"V-5065-KBW\")(condition (pristine ))) ))))) ((kind (name \"T-4832-BFV\")(condition (pristine ))) ((kind (name \"H-6678-ZEP\")(condition (broken (condition (pristine ))(missing ((kind (name \"V-9887-KUS\")(condition (pristine ))) ))))) ))))))(piled_on ((item (name \"N-0010-NGN\")(description \"an exemplary instance of part number N-0010-NGN\")(adjectives ((adjective \"tea-green\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"N-6458-NDX\")(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"L-6678-RYH\")(condition (pristine ))) ))))(missing ((kind (name \"P-9247-WCO\")(condition (pristine ))) ))))) ((kind (name \"R-1623-SJU\")(condition (pristine ))) )))))(piled_on ((item (name \"X-1403-GIE\")(description \"an exemplary instance of part number X-1403-GIE\")(adjectives ((adjective \"cinnamon\") ))(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"B-0010-LLL\")(condition (pristine ))) ))))(missing ((kind (name \"F-1623-QOS\")(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"J-4292-VRZ\")(condition (pristine ))) ))))(missing ((kind (name \"N-9887-AUI\")(condition (pristine ))) ))))) ))))(piled_on ((item (name \"T-4832-BFV\")(description \"an exemplary instance of part number T-4832-BFV\")(adjectives ((adjective \"gray20\") ))(condition (pristine ))(piled_on ((item (name \"D-6458-HSR\")(description \"an exemplary instance of part number D-6458-HSR\")(adjectives ((adjective \"beige\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"H-5065-MVY\")(condition (pristine ))) ))))(piled_on ((item (name \"F-4832-DAX\")(description \"an exemplary instance of part number F-4832-DAX\")(adjectives ((adjective \"ghost-white\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"J-1403-IDG\")(condition (pristine ))) ((kind (name \"D-6458-HSR\")(condition (broken (condition (pristine ))(missing ((kind (name \"H-5065-MVY\")(condition (pristine ))) ))))) ((kind (name \"V-4292-XMD\")(condition (broken (condition (pristine ))(missing ((kind (name \"Z-9887-CPK\")(condition (pristine ))) ))))) ((kind (name \"N-0010-NGN\")(condition (broken (condition (pristine ))(missing ((kind (name \"R-1623-SJU\")(condition (pristine ))) ))))) )))))))(piled_on ((item (name \"V-4292-XMD\")(description \"an exemplary instance of part number V-4292-XMD\")(adjectives ((adjective \"olive-green\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"Z-9887-CPK\")(condition (pristine ))) ))))(piled_on ((item (name \"H-4292-ZHF\")(description \"an exemplary instance of part number H-4292-ZHF\")(adjectives ((adjective \"light-brown\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"L-9887-EKM\")(condition (pristine ))) ))))(piled_on ((item (name \"X-6678-TTJ\")(description \"an exemplary instance of part number X-6678-TTJ\")(adjectives ((adjective \"lawn-green\") ))(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"B-9247-YWQ\")(condition (pristine ))) ))))(missing ((kind (name \"X-9887-GFO\")(condition (pristine ))) ((kind (name \"F-4832-DAX\")(condition (broken (condition (pristine ))(missing ((kind (name \"J-1403-IDG\")(condition (pristine ))) ))))) )))))(piled_on ((item (name \"T-4292-BCH\")(description \"an exemplary instance of part number T-4292-BCH\")(adjectives ((adjective \"aquamarine\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"X-9887-GFO\")(condition (pristine ))) ((kind (name \"X-6678-TTJ\")(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"B-9247-YWQ\")(condition (pristine ))) ))))(missing ((kind (name \"X-9887-GFO\")(condition (pristine ))) ))))) )))))(piled_on ((item (name \"P-6458-JNT\")(description \"an exemplary instance of part number P-6458-JNT\")(adjectives ((adjective \"maroon\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"T-5065-OQC\")(condition (pristine ))) ))))(piled_on ((item (name \"Z-0010-PBP\")(description \"an exemplary instance of part number Z-0010-PBP\")(adjectives ((adjective \"rust\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"D-1623-UEW\")(condition (pristine ))) ((kind (name \"H-4292-ZHF\")(condition (broken (condition (pristine ))(missing ((kind (name \"L-9887-EKM\")(condition (pristine ))) ))))) )))))(piled_on ((item (name \"F-5065-QLE\")(description \"an exemplary instance of part number F-5065-QLE\")(adjectives ((adjective \"cyan\") ))(condition (broken (condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"J-6678-VOL\")(condition (pristine ))) ))))(missing ((kind (name \"N-9247-ARS\")(condition (pristine ))) ))))(missing ((kind (name \"Z-0010-PBP\")(condition (broken (condition (pristine ))(missing ((kind (name \"D-1623-UEW\")(condition (pristine ))) ))))) ((kind (name \"R-4832-FUZ\")(condition (broken (condition (pristine ))(missing ((kind (name \"V-1403-KXI\")(condition (pristine ))) ))))) )))))(piled_on ((item (name \"V-9887-KUS\")(description \"an exemplary instance of part number V-9887-KUS\")(adjectives ((adjective \"lavender-blush\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"H-1403-MSK\")(condition (pristine ))) ))))(piled_on ((item (name \"B-6458-LIV\")(description \"an exemplary instance of part number B-6458-LIV\")(adjectives ((adjective \"olive-drab\") ))(condition (pristine ))(piled_on ((item (name \"D-5065-UBI\")(description \"an exemplary instance of part number D-5065-UBI\")(adjectives ((adjective \"plum\") ))(condition (broken (condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"R-5065-SGG\")(condition (pristine ))) ))))(missing ((kind (name \"V-6678-XJN\")(condition (pristine ))) ))))(missing ((kind (name \"Z-9247-CMU\")(condition (pristine ))) ((kind (name \"T-4292-BCH\")(condition (broken (condition (pristine ))(missing ((kind (name \"X-9887-GFO\")(condition (pristine ))) ))))) )))))(piled_on ((item (name \"L-9247-EHW\")(description \"an exemplary instance of part number L-9247-EHW\")(adjectives ((adjective \"magenta\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"P-4832-JKF\")(condition (broken (condition (pristine ))(missing ((kind (name \"T-1403-ONM\")(condition (pristine ))) ))))) ((kind (name \"D-5065-UBI\")(condition (broken (condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"R-5065-SGG\")(condition (pristine ))) ))))(missing ((kind (name \"V-6678-XJN\")(condition (pristine ))) ))))(missing ((kind (name \"Z-9247-CMU\")(condition (pristine ))) ))))) ((kind (name \"P-1623-WYY\")(condition (pristine ))) ))))))(piled_on ((item (name \"P-1623-WYY\")(description \"an exemplary instance of part number P-1623-WYY\")(adjectives ((adjective \"ochre\") ))(condition (pristine ))(piled_on ((item (name \"D-4832-HPD\")(description \"an exemplary instance of part number D-4832-HPD\")(adjectives ((adjective \"gray60\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"H-1403-MSK\")(condition (broken (condition (pristine ))(missing ((kind (name \"L-0010-RVR\")(condition (pristine ))) ))))) ))))(piled_on ((item (name \"B-1623-YTC\")(description \"an exemplary instance of part number B-1623-YTC\")(adjectives ((adjective \"chestnut\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"F-4292-DWJ\")(condition (pristine ))) ((kind (name \"Z-6458-PXZ\")(condition (broken (condition (pristine ))(missing ((kind (name \"J-9887-IAQ\")(condition (pristine ))) ))))) )))))(piled_on ((item (name \"Z-6458-PXZ\")(description \"an exemplary instance of part number Z-6458-PXZ\")(adjectives ((adjective \"rust\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"N-6458-NDX\")(condition (pristine ))) ))))(piled_on ((item (name \"Z-6458-PXZ\")(description \"an exemplary instance of part number Z-6458-PXZ\")(adjectives ((adjective \"robin-egg-blue\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"J-9887-IAQ\")(condition (pristine ))) ))))(piled_on ((item (name \"display\")(description \"a handheld device for showing textual data\")(adjectives )(condition (broken (condition (pristine ))(missing ((kind (name \"L-9247-EHW\")(condition (broken (condition (pristine ))(missing ((kind (name \"P-4832-JKF\")(condition (broken (condition (pristine ))(missing ((kind (name \"T-1403-ONM\")(condition (pristine ))) ))))) ))))) ((kind (name \"B-1623-YTC\")(condition (broken (condition (pristine ))(missing ((kind (name \"F-4292-DWJ\")(condition (pristine ))) ))))) ((kind (name \"R-4292-FRL\")(condition (broken (condition (broken (condition (pristine ))(missing ((kind (name \"V-9887-KUS\")(condition (pristine ))) ))))(missing ((kind (name \"Z-6458-PXZ\")(condition (broken (condition (pristine ))(missing ((kind (name \"D-5065-UBI\")(condition (pristine ))) ))))) ))))) ((kind (name \"N-1623-AOE\")(condition (pristine ))) )))))))(piled_on ((item (name \"X-0010-TQT\")(description \"an exemplary instance of part number X-0010-TQT\")(adjectives ((adjective \"navajo-white\") ))(condition (broken (condition (pristine ))(missing ((kind (name \"H-6678-ZEP\")(condition (pristine ))) ))))(piled_on )) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))) ))))))";
             var roomInfo = SexpToItems.parseStack(rawSexp);
-            StackSolver solver = new StackSolver(roomInfo._2, new ArrayList<>(), new Item("USB cable", null, List.of()));
+            System.out.println(roomInfo);
+            StackSolver solver = new StackSolver(roomInfo._2, new ArrayList<>(), new Item("display", null, Set.of()));
             List<String> plan = solver.solve();
             System.out.println("Plan:");
             for (String step : plan) {

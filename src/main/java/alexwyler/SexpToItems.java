@@ -5,7 +5,9 @@ import io.vavr.Tuple2;
 import io.vavr.Tuple3;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 // Courtesy of ChatGPT
 public final class SexpToItems {
@@ -71,7 +73,7 @@ public final class SexpToItems {
     private static StackSolver.Item toItem(List<?> it) {
         String name = str(field(it, "name"), 1);
         String adj = firstAdj(field(it, "adjectives"));
-        List<StackSolver.Item> miss = missing(field(it, "condition"));
+        Set<Item> miss = missing(field(it, "condition"));
         return new StackSolver.Item(name, adj, miss);
     }
 
@@ -87,25 +89,25 @@ public final class SexpToItems {
         return null;
     }
 
-    private static List<StackSolver.Item> missing(Object cond) {
+    private static Set<StackSolver.Item> missing(Object cond) {
         if (!(cond instanceof List<?> l) || l.size() < 2) {
-            return List.of();
+            return Set.of();
         }
         return fromState(l.get(1));
     }
 
-    private static List<StackSolver.Item> fromState(Object st) {
+    private static Set<StackSolver.Item> fromState(Object st) {
         if (!(st instanceof List<?> s) || s.isEmpty()) {
-            return List.of();
+            return Set.of();
         }
-        if ("pristine".equals(s.get(0))) {
-            return List.of();
-        }
+//        if ("pristine".equals(s.get(0))) {
+//            return Set.of();
+//        }
         if (!"broken".equals(s.get(0))) {
-            return List.of();
+            return Set.of();
         }
 
-        List<StackSolver.Item> out = new ArrayList<>();
+        Set<StackSolver.Item> out = new HashSet<>();
         // direct (missing ((kind ...)...))
         for (Object ch : s) {
             if (headIs(ch, "missing") && ((List<?>) ch).size() >= 2) {
@@ -122,7 +124,7 @@ public final class SexpToItems {
         return out;
     }
 
-    private static void collectKinds(Object node, List<StackSolver.Item> out) {
+    private static void collectKinds(Object node, Set<StackSolver.Item> out) {
         if (headIs(node, "kind")) {
             out.add(kind((List<?>) node));
             return;
@@ -137,7 +139,7 @@ public final class SexpToItems {
     private static StackSolver.Item kind(List<?> k) {
         String name = str(field(k, "name"), 1);
         String adj = firstAdj(field(k, "adjectives"));
-        List<StackSolver.Item> miss = missing(field(k, "condition"));
+        Set<StackSolver.Item> miss = missing(field(k, "condition"));
         return new StackSolver.Item(name, adj, miss);
     }
 

@@ -54,6 +54,7 @@ public class ChicagoSolver {
             return false;
         }
         var inRoom = roomInfo._2;
+        log("In room " + roomName + ", items: " + inRoom);
         var foundInRoom = inRoom.stream()
             .filter(lf -> lf.name().equals(lookingFor.name()))
             .findFirst()
@@ -64,11 +65,12 @@ public class ChicagoSolver {
             log("Raw room info: " + rawSexp);
             var inventory = SexpToItems.parseStack(asyncIO.call("inventory"))._2;
             log("Inventory: " + inventory);
+            log("Solving to get " + lookingFor + " from " + inRoom + " with inventory " + inventory);
             StackSolver stackSolver = new StackSolver(roomInfo._2, inventory, lookingFor);
             var plan = stackSolver.solve();
             log("Plan to get " + lookingFor + ": " + plan);
             plan.forEach(planLine -> {
-                log("Inventory: " + SexpToItems.parseStack(asyncIO.call("inventory"))._2);
+                log("Inventory: " + SexpToItems.parseStack(asyncIO.call("inventory", true))._2);
                 if (!SexpToItems.parseStack(asyncIO.call(planLine, true))._1) {
                     throw new RuntimeException("Failed to execute plan line: " + planLine + " to get " + lookingFor);
                 }
@@ -78,14 +80,14 @@ public class ChicagoSolver {
 
         for (var directions : List.of(List.of("north", "south"), List.of("east", "west"))) {
             for (var direction : directions) {
-                var goInfo = SexpToItems.parseStack(asyncIO.call("go " + direction));
+                var goInfo = SexpToItems.parseStack(asyncIO.call("go " + direction, true));
                 if (!goInfo._1) {
                     continue;
                 }
 
                 boolean result = dfsLooking(lookingFor, visitedRooms);
                 String opposite = directions.get((directions.indexOf(direction) + 1) % 2);
-                asyncIO.call("go " + opposite);
+                asyncIO.call("go " + opposite, true);
                 return result;
             }
         }
